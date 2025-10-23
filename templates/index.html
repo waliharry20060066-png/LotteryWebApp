@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>大乐透查询</title>
+    <!-- 引入Pico.css让界面更美观 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        body { padding: 1em; }
+        textarea { height: 120px; font-family: monospace; }
+        #results h4 { margin-top: 1.5em; }
+        #results p { margin: 0.2em 0 0.2em 1em; }
+        .win { color: #d32f2f; } /* 红色 */
+        .add-win { color: #1976d2; } /* 蓝色 */
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h2 style="text-align: center;">大乐透开奖查询</h2>
+        
+        <article>
+            <label for="numbers">我的号码 (每行一组)</label>
+            <textarea id="numbers" placeholder="例如: 01 02 03 04 05 06 07"></textarea>
+
+            <div class="grid">
+                <label for="start_draw">
+                    从第几期开始查
+                    <input type="text" id="start_draw" placeholder="例如: 24001">
+                </label>
+                <label for="num_draws">
+                    总共查询几期
+                    <input type="number" id="num_draws" value="5">
+                </label>
+            </div>
+            
+            <fieldset>
+                <label for="additional_bet">
+                    <input type="checkbox" id="additional_bet" name="additional_bet" role="switch">
+                    所有号码追加投注
+                </label>
+            </fieldset>
+
+            <button id="check_button" onclick="checkWinnings()">开始查询</button>
+        </article>
+        
+        <hr>
+        
+        <article id="results_container" style="display: none;">
+            <h3>查询结果</h3>
+            <div id="results"></div>
+            <h2 id="total_winnings" style="text-align: right;">总中奖金额: 0.00 元</h2>
+        </article>
+
+    </main>
+
+    <script>
+        // --- 核心交互逻辑 ---
+        
+        // 页面加载时，从本地存储读取数据
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('numbers').value = localStorage.getItem('lottery_numbers') || '';
+            document.getElementById('start_draw').value = localStorage.getItem('lottery_start_draw') || '';
+            document.getElementById('num_draws').value = localStorage.getItem('lottery_num_draws') || '5';
+            document.getElementById('additional_bet').checked = localStorage.getItem('lottery_is_additional') === 'true';
+        });
+
+        async function checkWinnings() {
+            const numbers = document.getElementById('numbers').value;
+            const start_draw = document.getElementById('start_draw').value;
+            const num_draws = document.getElementById('num_draws').value;
+            const is_additional = document.getElementById('additional_bet').checked;
+            const button = document.getElementById('check_button');
+            const resultsContainer = document.getElementById('results_container');
+            const resultsDiv = document.getElementById('results');
+            const totalWinningsEl = document.getElementById('total_winnings');
+
+            // 保存用户输入到本地存储
+            localStorage.setItem('lottery_numbers', numbers);
+            localStorage.setItem('lottery_start_draw', start_draw);
+            localStorage.setItem('lottery_num_draws', num_draws);
+            localStorage.setItem('lottery_is_additional', is_additional);
+
+            button.setAttribute('aria-busy', 'true');
+            button.textContent = '正在查询...';
+            resultsContainer.style.display = 'none';
+
+            try {
+                const response = await fetch('/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numbers, start_draw, num_draws, is_additional })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '未知错误');
+                }
+
+                resultsDiv.innerHTML = data.results_html;
+                totalWinningsEl.textContent = `总中奖金额: ${data.total_winnings} 元`;
+                resultsContainer.style.display = 'block';
+
+            } catch (error) {
+                alert(`查询失败: ${error.message}`);
+            } finally {
+                button.removeAttribute('aria-busy');
+                button.textContent = '开始查询';
+            }
+        }
+    </script>
+</body>
+</html>
